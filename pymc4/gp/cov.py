@@ -6,6 +6,7 @@ Covariance Functions for PyMC4's Gaussian Process module.
 from abc import abstractmethod
 import tensorflow as tf
 import tensorflow_probability as tfp
+from .util import _default_dtype, _cast_dtype
 
 __all__ = [
     #     "Constant",
@@ -30,9 +31,10 @@ __all__ = [
 class Covariance:
     r"""Base class of all Covariance functions for Gaussian Process"""
 
-    def __init__(self, feature_ndims, diag=False, **kwargs):
+    def __init__(self, feature_ndims, diag=False, dtype=_default_dtype(), **kwargs):
         self.feature_ndims = feature_ndims
         self.diag = diag
+        self._dtype = dtype
         self._kernel = self._init_kernel(feature_ndims=self.feature_ndims, **kwargs)
 
     @abstractmethod
@@ -40,8 +42,10 @@ class Covariance:
         raise NotImplementedError("Your Covariance class should override this method")
 
     def __call__(self, X1, X2, **kwargs):
+        X1 = _cast_dtype(X1, self._dtype)
+        X2 = _cast_dtype(X2, self._dtype)
         if self.diag:
-            return tf.linalg.diag_part(self._kernel.apply(X1, X2, **kwargs))
+            return tf.linalg.diag_part(self._kernel.matrix(X1, X2, **kwargs))
         else:
             return self._kernel.matrix(X1, X2, **kwargs)
 
@@ -59,6 +63,10 @@ class Covariance:
     @property
     def batch_shape(self):
         return self._kernel.batch_shape
+
+    @property
+    def dtype(self):
+        return self._dtype
 
 
 class Combination(Covariance):
@@ -145,10 +153,10 @@ class ExpQuad(Stationary):
         Other keyword arguments that tfp's ``ExponentiatedQuadratic`` kernel takes
     """
 
-    def __init__(self, amplitude, length_scale, feature_ndims, diag=False, **kwargs):
+    def __init__(self, amplitude, length_scale, feature_ndims, diag=False, dtype=_default_dtype(), **kwargs):
         self._amplitude = amplitude
         self._length_scale = length_scale
-        super().__init__(feature_ndims=feature_ndims, diag=diag, **kwargs)
+        super().__init__(feature_ndims=feature_ndims, diag=diag, dtype=dtype, **kwargs)
 
     def _init_kernel(self, feature_ndims, **kwargs):
         return tfp.math.psd_kernels.ExponentiatedQuadratic(

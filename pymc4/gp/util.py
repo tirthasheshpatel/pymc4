@@ -1,5 +1,19 @@
 import tensorflow as tf
 import numpy as np
+import warnings
+
+
+def _default_dtype():
+    return tf.float64
+
+
+def _cast_dtype(tensor, dtype):
+    if not tf.is_tensor(tensor):
+        tensor = tf.convert_to_tensor(tensor)
+    if tensor.dtype != dtype:
+        warnings.warn("implicitly typecasting to {}".format(dtype), UserWarning)
+        tensor = tf.cast(tensor, dtype)
+    return tensor
 
 
 def stabilize(K):

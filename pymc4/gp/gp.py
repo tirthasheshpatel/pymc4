@@ -11,7 +11,7 @@ import tensorflow as tf
 # from .cov import ExpQuad
 # from .mean import Zero
 from ..distributions import MvNormal, Normal
-from .util import stabilize
+from .util import stabilize, _cast_dtype
 
 
 __all__ = ["LatentGP"]
@@ -26,6 +26,10 @@ class BaseGP:
         self.feature_ndims = mean_fn.feature_ndims
         self.mean_fn = mean_fn
         self.cov_fn = cov_fn
+        if cov_fn._dtype != mean_fn._dtype:
+            # handle dtype
+            pass
+        self._dtype = cov_fn._dtype
 
     def prior(self, name, X, **kwargs):
         raise NotImplementedError
@@ -38,6 +42,10 @@ class BaseGP:
 
     def marginal_likelihood(self, name, X, **kwargs):
         raise NotImplementedError
+
+    @property
+    def dtype(self):
+        return self._dtype
 
 
 class LatentGP(BaseGP):
@@ -121,6 +129,7 @@ class LatentGP(BaseGP):
             X, f = given["X"], given["f"]
         else:
             X, f = self.X, self.f
+        f = _cast_dtype(f, dtype=self._dtype)
         return X, f, cov_total, mean_total
 
     def _build_conditional(self, Xnew, X, f, cov_total, mean_total):
@@ -165,6 +174,7 @@ class LatentGP(BaseGP):
         **kwargs :
             Extra keyword arguments that are passed to distribution constructor.
         """
+        X = _cast_dtype(X, self._dtype)
         f = self._build_prior(name, X, **kwargs)
         self.X = X
         self.f = f
@@ -193,6 +203,7 @@ class LatentGP(BaseGP):
             Extra keyword arguments that are passed to `MvNormal` distribution
             constructor.
         """
+        Xnew = _cast_dtype(Xnew, self._dtype)
         givens = self._get_given_vals(given)
         mu, cov = self._build_conditional(Xnew, *givens)
         if self._is_univariate(Xnew):
